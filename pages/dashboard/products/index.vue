@@ -4,32 +4,34 @@
 
             <!-- Header Section -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <!-- Título -->
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Gestión de Productos</h1>
-                    <p class="text-gray-500 dark:text-gray-400 mt-1">Gestiona tu inventario de productos y detalles</p>
+                    <h1 class="text-3xl font-bold">Gestión de Productos</h1>
+                    <p class="text-gray-500 dark:text-gray-400 mt-1">
+                        Gestiona tu inventario de productos y detalles
+                    </p>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <!-- Buscador -->
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <i class="ri-search-line text-gray-400"></i>
-                        </div>
-                        <input v-model="searchQuery" type="text" placeholder="Buscar productos..."
-                            class="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
-                    </div>
 
-                    <!-- Botones de acción -->
+                <!-- Controles -->
+                <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                    <!-- Ordenar -->
+                    <USelect v-model="sortOrder" :options="[
+                        { label: 'Más recientes primero', value: 'desc' },
+                        { label: 'Más antiguos primero', value: 'asc' }
+                    ]" @change="filterProducts" class="w-full sm:w-48" placeholder="Ordenar por" />
+
+                    <!-- Buscador -->
+                    <UInput v-model="searchQuery" icon="i-heroicons-magnifying-glass-20-solid"
+                        placeholder="Buscar productos..." class="w-full sm:w-64" />
+
+                    <!-- Botones -->
                     <div class="flex gap-2">
-                        <button @click="exportToExcel"
-                            class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-md hover:shadow-lg">
-                            <i class="ri-file-excel-line"></i>
-                            <span>Exportar</span>
-                        </button>
-                        <button @click="openModal()"
-                            class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-lg hover:from-blue-700 hover:to-blue-600 transition-all shadow-md hover:shadow-lg">
-                            <i class="ri-add-line"></i>
-                            <span>Agregar</span>
-                        </button>
+                        <UButton icon="i-heroicons-document-arrow-down" color="green" @click="exportToExcel">
+                            Exportar
+                        </UButton>
+                        <UButton icon="i-heroicons-plus-circle" color="blue" @click="openModal">
+                            Agregar
+                        </UButton>
                     </div>
                 </div>
             </div>
@@ -81,6 +83,10 @@
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Stock</th>
                                 <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Fecha creación
+                                </th>
+                                <th scope="col"
                                     class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Acción</th>
                             </tr>
@@ -125,6 +131,8 @@
                                     class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                                     S/. {{ product.price }}
                                 </td>
+
+
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span :class="{
                                         'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200': product.stock > 10,
@@ -133,6 +141,9 @@
                                     }" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
                                         {{ product.stock }} en stock
                                     </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                    {{ formatDate(product.createdAt) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div class="flex justify-end gap-2">
@@ -425,6 +436,7 @@ const searchQuery = ref(''); // Para el buscador
 const currentPage = ref(1); // Paginación
 const itemsPerPage = ref(10); // Items por página
 
+const sortOrder = ref('desc'); // 'desc' para recientes primero, 'asc' para más antiguos
 definePageMeta({
     middleware: ['auth'],
     layout: 'dashboard',
@@ -440,16 +452,25 @@ const paginatedProducts = computed(() => {
 
 // Función para filtrar productos
 const filterProducts = () => {
-    if (!searchQuery.value) {
-        filteredProducts.value = [...products.value];
-    } else {
+    let filtered = [...products.value]; // Inicializa con copia de los productos
+
+    if (searchQuery.value) {
         const query = searchQuery.value.toLowerCase();
-        filteredProducts.value = products.value.filter(product =>
+        filtered = filtered.filter(product =>
             product.name.toLowerCase().includes(query) ||
             product.description.toLowerCase().includes(query) ||
             getCategoryName(product.categoryId).toLowerCase().includes(query)
         );
     }
+
+    // Ordenar según sortOrder
+    filtered.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return sortOrder.value === 'desc' ? dateB - dateA : dateA - dateB;
+    });
+
+    filteredProducts.value = filtered;
     currentPage.value = 1; // Resetear a la primera página al filtrar
 };
 
@@ -490,6 +511,9 @@ const fetchProducts = async () => {
 
 // Observar cambios en searchQuery
 watch(searchQuery, filterProducts);
+
+// Observar cambios en sortOrder
+watch(sortOrder, filterProducts);
 
 // Observar cambios en products
 watch(products, filterProducts, { deep: true });
@@ -720,7 +744,10 @@ const handleEscapeKey = (event: KeyboardEvent) => {
     }
 };
 
-
+const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString('es-ES', options);
+};
 </script>
 
 <style scoped>
