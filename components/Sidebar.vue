@@ -355,7 +355,7 @@ onMounted(() => {
 });
 
 watch(() => route.path, (newPath) => {
-    console.log('Ruta cambiada a:', newPath);
+
     openSubmenus.value = [];
     // Reabrir submenú si corresponde
     menuItems.forEach(item => {

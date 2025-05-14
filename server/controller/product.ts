@@ -235,9 +235,12 @@ export const productByCategoryId = async (event: H3Event) => {
     });
   }
 };
+
 export const addProduct = async (event: H3Event): Promise<string> => {
   try {
     const body = await readBody<ProductWithPromotion>(event);
+
+    const promo = body.promotions;
 
     const product = await prisma.product.create({
       data: {
@@ -247,16 +250,18 @@ export const addProduct = async (event: H3Event): Promise<string> => {
         stock: body.stock,
         imageUrl: body.imageUrl,
         categoryId: body.categoryId,
-        promotions: body.promotions ? {
-          create: {
-            title: body.promotions.title,
-            description: body.promotions.description,
-            discount: body.promotions.discount,
-            isPercentage: body.promotions.isPercentage,
-            startDate: new Date(body.promotions.startDate),
-            endDate: new Date(body.promotions.endDate),
+        ...(promo && promo.title && promo.startDate && promo.endDate && {
+          promotions: {
+            create: {
+              title: promo.title,
+              description: promo.description ?? "",
+              discount: promo.discount ?? 0,
+              isPercentage: promo.isPercentage ?? false,
+              startDate: new Date(promo.startDate),
+              endDate: new Date(promo.endDate),
+            }
           }
-        } : undefined,
+        })
       },
     });
 
@@ -269,7 +274,6 @@ export const addProduct = async (event: H3Event): Promise<string> => {
     });
   }
 };
-
 export const updateProduct = async (event: H3Event): Promise<string> => {
   try {
     const request = await readBody<ProductWithPromotion>(event);

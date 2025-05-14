@@ -480,8 +480,6 @@ const fetchProducts = async () => {
 
         const { data } = await useFetch("/api/v1/product");
         products.value = data.value || [];
-        console.log("productos", products);
-
         filteredProducts.value = [...products.value];
     } catch (err) {
         error.value = "Failed to load products.";
@@ -561,7 +559,6 @@ const onPromoToggle = () => {
             startDate: "",
             endDate: ""
         };
-        console.log("🔁 Promoción desactivada y campos limpiados");
     }
 };
 // Abrir modal
@@ -639,8 +636,6 @@ const saveProduct = async () => {
         };
 
         if (editingProduct.value) {
-            console.log("antede de actulizar", productData);
-
 
             const { data, error } = await useFetch(`/api/v1/updateProduct/${editingProduct.value.id}`, {
                 method: "PUT",
@@ -652,13 +647,19 @@ const saveProduct = async () => {
                 return;
             }
 
-
             $toast.success("Producto actualizado correctamente");
         } else {
-            await useFetch("/api/v1/addProduct", {
+            const response = await useFetch("/api/v1/addProduct", {
                 method: "POST",
                 body: productData
             });
+
+            if (response.error.value) {
+                console.error("Error al guardar el producto:", response.error.value);
+                $toast.error(response.error.value.data?.message || "Error al guardar el producto");
+                return;
+            }
+
             $toast.success("Producto agregado correctamente");
         }
 
