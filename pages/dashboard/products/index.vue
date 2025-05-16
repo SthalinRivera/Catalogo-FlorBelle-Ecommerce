@@ -105,7 +105,7 @@
                                         <div class="ml-4">
                                             <div class="text-sm font-medium text-gray-900 dark:text-white">{{
                                                 product.name
-                                                }}</div>
+                                            }}</div>
                                             <div class="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{{
                                                 truncateText(product.description, 50) }}</div>
                                         </div>
@@ -220,7 +220,7 @@
                     <div class="p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-xl font-bold text-gray-800 dark:text-white">
-                                {{ editingProduct ? "Editar Producto" : "Agregar Producto" }}
+                                {{ editingProduct.value ? "Editar Producto" : "Agregar Producto" }}
                             </h2>
                             <button @click="showModal = false"
                                 class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
@@ -391,7 +391,7 @@
                                     'bg-gray-400 cursor-not-allowed': !isFormValid
                                 }"
                                     class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors">
-                                    {{ editingProduct ? "Actualizar Producto" : "Agregar Producto" }}
+                                    {{ editingProduct.value ? "Actualizar Producto" : "Agregar Producto" }}
                                 </button>
                             </div>
                         </form>
@@ -586,7 +586,7 @@ const onPromoToggle = () => {
     }
 };
 // Abrir modal
-const openModal = async (product: Product | null = null) => {
+const openModal = async (product = null) => {
     editingProduct.value = product;
 
     if (product) {
@@ -659,8 +659,7 @@ const saveProduct = async () => {
             imageUrl: imageUrl.value || formState.imageUrl,
         };
 
-        if (editingProduct.value) {
-
+        if (editingProduct.value.id) {
             const { data, error } = await useFetch(`/api/v1/updateProduct/${editingProduct.value.id}`, {
                 method: "PUT",
                 body: productData
@@ -673,6 +672,8 @@ const saveProduct = async () => {
 
             $toast.success("Producto actualizado correctamente");
         } else {
+
+
             const response = await useFetch("/api/v1/addProduct", {
                 method: "POST",
                 body: productData
