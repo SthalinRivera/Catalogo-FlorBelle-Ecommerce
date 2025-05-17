@@ -66,7 +66,7 @@ const { data: products } = await useFetch('/api/v1/product/');
 const searchQuery = ref('');
 const sortOption = ref('name-asc');
 const currentPage = ref(1);
-const perPage = ref(12);
+const perPage = ref(15);
 
 // Opciones de ordenamiento
 const sortOptions = [

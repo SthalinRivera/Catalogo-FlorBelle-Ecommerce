@@ -62,7 +62,7 @@
                     class="group flex bg-gray-50 dark:bg-slate-800  transition-all duration-300 md:flex-row rounded-lg">
                     <!-- Imagen del producto -->
                     <div class="relative overflow-hidden rounded-s-lg ">
-                        <img class="object-cover w-80 md:w-full h-full  rounded-s-lg transition-transform duration-300 group-hover:scale-105"
+                        <img class="object-cover w-80 h-32 md:w-96 md:h-80  rounded-s-lg transition-transform duration-300 group-hover:scale-105"
                             :src="product.imageUrl || 'https://images.unsplash.com/photo-1600269452121-4f2416e55c28?ixlib=rb-4.0.3&auto=format&fit=crop&w=765&q=80'"
                             :alt="product.name" />
                     </div>
