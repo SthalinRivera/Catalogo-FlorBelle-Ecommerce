@@ -72,6 +72,9 @@
                                     Producto</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Slug</th>
+                                <th scope="col"
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                     Categoría</th>
                                 <th scope="col"
                                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -110,6 +113,11 @@
                                                 truncateText(product.description, 50) }}</div>
                                         </div>
                                     </div>
+                                </td>
+                                <td
+                                    class="px-6 py-4 whitespace-nowrap text-[12px] font-medium text-gray-900 dark:text-white">
+                                    {{ product.slug }}
+
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span
