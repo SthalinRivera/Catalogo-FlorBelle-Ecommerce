@@ -58,129 +58,59 @@ export const paginatedProducts = async (event: H3Event) => {
 }
 
 
-// export const productById = async (event: H3Event) => {
-//   const request = getRouterParams(event);
-//   if (!request.id) {
-//     throw createError({
-//       statusCode: 400,
-//       name: "Product invalid",
-//       message: "Product ID is required",
-//     });
-//   }
-
-//   const product = await prisma.product.findFirst({
-//     where: {
-//       id: +request.id,
-//     },
-//     include: {
-//       category: {
-//         select: {
-//           name: true,
-//         },
-//       },
-//     },
-//   });
-
-//   if (!product) {
-//     throw createError({
-//       statusCode: 404,
-//       name: "Product not found",
-//       message: "No product found with the given ID",
-//     });
-//   }
-
-//   return product;
-// };
-// export const productById = async (event: H3Event) => {
-//   const request = getRouterParams(event);
-//   if (!request.id) {
-//     throw createError({
-//       statusCode: 400,
-//       name: "Product invalid",
-//       message: "Product ID is required",
-//     });
-//   }
-
-//   const now = new Date();
-//   const product = await prisma.product.findUnique({
-//     where: { id: +request.id },
-//     include: {
-//       category: { select: { name: true } },
-//       promotions: {
-//         where: {
-//           startDate: { lte: now },
-//           endDate: { gte: now }
-//         },
-//         orderBy: { discount: 'desc' },
-//         take: 1
-//       }
-//     },
-//   });
-
-//   if (!product) {
-//     throw createError({
-//       statusCode: 404,
-//       name: "Product not found",
-//       message: "No product found with the given ID",
-//     });
-//   }
-
-//   // Calcular precio con descuento
-//   const currentPrice = product.promotions.length > 0
-//     ? calculateDiscountedPrice(product.price, product.promotions[0])
-//     : product.price;
-
-//   return {
-//     ...product,
-//     currentPrice,
-//     originalPrice: product.price,
-//     hasPromotion: product.promotions.length > 0
-//   };
-// };
 export const productById = async (event: H3Event) => {
-  const { id } = getRouterParams(event);
+  const { id } = getRouterParams(event); // puede ser slug o id
   const now = new Date();
 
-  // 1. Obtener el producto con promociones activas
-  const product = await prisma.product.findUnique({
-    where: { id: Number(id) },
+  if (!id) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "ID o slug requerido",
+    });
+  }
+
+  // Detectar si es un número (ID) o texto (slug)
+  const isNumericId = !isNaN(Number(id));
+
+  // Buscar producto por ID o por slug
+  const product = await prisma.product.findFirst({
+    where: isNumericId
+      ? { id: Number(id) }
+      : { slug: id },
     include: {
       category: true,
       promotions: {
         where: {
           startDate: { lte: now },
-          endDate: { gte: now }
+          endDate: { gte: now },
         },
-        orderBy: { discount: 'desc' }
-      }
-    }
+        orderBy: { discount: "desc" },
+      },
+    },
   });
 
   if (!product) {
     throw createError({
       statusCode: 404,
-      statusMessage: "Producto no encontrado"
+      statusMessage: "Producto no encontrado",
     });
   }
 
-  // 2. Convertir precios a números (evitar strings como "23")
-  const price = parseFloat(product.price.toString()); // Asegura que sea número
+  const price = parseFloat(product.price.toString());
   const hasPromotion = product.promotions.length > 0;
   const currentPromotion = hasPromotion ? product.promotions[0] : null;
 
-  // 3. Calcular precio con descuento (manejo seguro de tipos)
   const currentPrice = currentPromotion
     ? calculateDiscountedPrice(price, currentPromotion)
     : price;
 
-  // 4. Retornar datos consistentes (todos los precios como números)
   return {
     ...product,
-    price: price,          // Número (ej: 23)
-    currentPrice,          // Número (ej: 11.5 si hay 50% de descuento)
-    originalPrice: price,  // Número (igual que price, pero útil para el frontend)
+    price,
+    originalPrice: price,
+    currentPrice,
     hasPromotion,
-    currentPromotion: currentPromotion
+    currentPromotion,
   };
 };
 
@@ -195,9 +125,6 @@ function calculateDiscountedPrice(price: number, promotion: any) {
     return Math.max(0, price - discount); // Descuento fijo (ej: 10€ de descuento)
   }
 }
-
-
-
 export const productByCategoryId = async (event: H3Event) => {
   const request = getRouterParams(event);  // Extracts parameters from the event object
 
@@ -236,6 +163,59 @@ export const productByCategoryId = async (event: H3Event) => {
   }
 };
 
+export const productBySlug = async (event: H3Event) => {
+  const { slug } = getRouterParams(event);
+
+  if (!slug) {
+    throw createError({
+      statusCode: 400,
+      name: "Invalid Slug",
+      message: "El slug de categoría es requerido.",
+    });
+  }
+
+  try {
+    const category = await prisma.category.findUnique({
+      where: { slug },
+      include: {
+        products: {
+          orderBy: {
+            id: "asc",
+          },
+          include: {
+            category: true,
+          },
+        },
+      },
+    });
+
+    if (!category) {
+      throw createError({
+        statusCode: 404,
+        name: "Category Not Found",
+        message: `No se encontró una categoría con el slug "${slug}"`,
+      });
+    }
+
+    return category.products;
+  } catch (error: any) {
+    console.error("Error al obtener productos por slug:", error);
+    throw createError({
+      statusCode: 500,
+      name: "Error Fetching Category Products",
+      message: error.message,
+    });
+  }
+};
+
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD') // elimina acentos
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-') // reemplaza caracteres no alfanuméricos por guiones
+    .replace(/^-+|-+$/g, ''); // quita guiones al inicio/final
+}
 export const addProduct = async (event: H3Event): Promise<string> => {
   try {
     const body = await readBody<ProductWithPromotion>(event);
@@ -245,6 +225,7 @@ export const addProduct = async (event: H3Event): Promise<string> => {
     const product = await prisma.product.create({
       data: {
         name: body.name,
+        slug: generateSlug(body.name), // ✅ Slug generado automáticamente
         description: body.description,
         price: body.price,
         stock: body.stock,
@@ -274,6 +255,8 @@ export const addProduct = async (event: H3Event): Promise<string> => {
     });
   }
 };
+
+
 export const updateProduct = async (event: H3Event): Promise<string> => {
   try {
     const request = await readBody<ProductWithPromotion>(event);
@@ -302,6 +285,7 @@ export const updateProduct = async (event: H3Event): Promise<string> => {
       where: { id: productId },
       data: {
         name: request.name,
+        slug: generateSlug(request.name), // ✅ Se actualiza el slug
         description: request.description,
         price: Number(request.price),
         stock: Number(request.stock),

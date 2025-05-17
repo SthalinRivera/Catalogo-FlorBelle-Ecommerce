@@ -20,6 +20,7 @@ router.get('/product', defineEventHandler(productController.allProduct));
 router.get('/product/:id', defineEventHandler(productController.productById));
 router.put('/updateProduct/:id', defineEventHandler(productController.updateProduct));
 router.delete('/deleteProduct/:id', defineEventHandler(productController.deleteProduct));
+router.get('/productByCategorySlug/:slug', defineEventHandler(productController.productBySlug));
 router.get('/productByCategoryId/:id', defineEventHandler(productController.productByCategoryId));
 router.get('/productByCategoryIdCount/:id', defineEventHandler(categoryController.productByCategoryIdCount));
 

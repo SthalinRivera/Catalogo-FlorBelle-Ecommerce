@@ -137,7 +137,8 @@
 import type { Product } from '~/interfaces/product';
 
 const route = useRoute();
-const { id } = route.params;
+// const { id } = route.params;
+const slug = route.params.id;
 const { $toast } = useNuxtApp();
 const productStore = useProductStore();
 
@@ -153,15 +154,17 @@ const fetchProductsByCategory = async () => {
     loading.value = true;
 
     // Obtener productos
-    const { data: productsData } = await useFetch<Product[]>(
-      `/api/v1/productByCategoryId/${id}`,
-      { default: () => [] }
+    const { data: productsData } = await useFetch<Product[]>(`/api/v1/productByCategorySlug/${slug}`,
+      {
+        default: () => []
+      }
     );
+    console.log("Products data:", productsData.value);
 
     // Obtener nombre de categoría
     if (productsData.value?.length > 0) {
       try {
-        const { data: categoryData, error } = await useFetch(`/api/v1/categoryById/${id}`);
+        const { data: categoryData, error } = await useFetch(`/api/v1/categoryBySlug/${slug}`);
 
         if (error.value) {
           console.error("Error fetching category:", error.value);
@@ -219,7 +222,8 @@ const sortedProducts = computed(() => {
 });
 
 // Observar cambios en el ID de categoría
-watch(() => route.params.id, fetchProductsByCategory, { immediate: true });
+//watch(() => route.params.id, fetchProductsByCategory, { immediate: true });
+watch(() => route.params.slug, fetchProductsByCategory, { immediate: true });
 </script>
 
 <style scoped>

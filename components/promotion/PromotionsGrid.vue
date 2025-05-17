@@ -58,14 +58,15 @@
         <div v-else class="">
             <!-- Grid de productos -->
             <div class="grid gap-1 md:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ">
-                <NuxtLink v-for="product in products" :key="product.id" :to="`/product/${product.id}`"
+                <NuxtLink v-for="product in products" :key="product.id" :to="`/product/${product.slug || product.id}`"
                     class="group flex bg-gray-50 dark:bg-slate-800  transition-all duration-300 md:flex-row rounded-lg">
                     <!-- Imagen del producto -->
                     <div class="relative overflow-hidden rounded-s-lg ">
-                        <img class="object-cover w-32 h-32 md:h-80 md:w-80 rounded-s-lg transition-transform duration-300 group-hover:scale-105"
+                        <img class="object-cover w-80 md:w-full h-full  rounded-s-lg transition-transform duration-300 group-hover:scale-105"
                             :src="product.imageUrl || 'https://images.unsplash.com/photo-1600269452121-4f2416e55c28?ixlib=rb-4.0.3&auto=format&fit=crop&w=765&q=80'"
                             :alt="product.name" />
                     </div>
+
                     <!-- Contenido del producto -->
                     <div class="flex flex-col justify-center p-4 leading-normal w-full">
                         <!-- Promoción encima de la imagen -->
@@ -128,7 +129,8 @@
                             </div>
                             <span v-if="product.stock > 0"
                                 class="text-xs md:text-sm bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-2 py-1 rounded-full">
-                                {{ product.stock }} disponibles
+                                <span class="md:hidden">{{ product.stock }} disp.</span>
+                                <span class="hidden md:inline">{{ product.stock }} disponibles</span>
                             </span>
                             <span v-else
                                 class="text-xs bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 px-2 py-1 rounded-full animate-pulse">

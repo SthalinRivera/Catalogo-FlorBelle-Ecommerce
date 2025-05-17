@@ -22,7 +22,7 @@ const categorias = computed(() => categoriesData.value || [])
 
 const navegarACategoria = (categoria: Category) => {
     // navigateTo(`/category/${categoria.slug || categoria.id}`)
-    navigateTo(`/category/${categoria.id}`)
+    navigateTo(`/category/${categoria.slug || categoria.id}`)
 }
 </script>
 

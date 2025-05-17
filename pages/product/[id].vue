@@ -216,7 +216,9 @@ import { useProductShoppingCartStore } from '~/stores/productShoppingCart';
 const productStore = useProductStore();
 const { $toast } = useNuxtApp();
 const route = useRoute();
-const { id } = route.params;
+// const { id } = route.params;
+const slug = route.params.id;
+
 const { addToFavorites } = useProductStore();
 // Verificar si un producto está en favoritos
 const isFavorite = (productId: number) => {
@@ -246,9 +248,7 @@ const isImageModalOpen = ref(false);
 const currentImage = ref('');
 
 // Obtener datos del producto
-const { data: productData, error } = await useFetch<Product>(`/api/v1/product/${id}`);
-
-console.log(" debe de traer las promociones ", productData);
+const { data: productData, error } = await useFetch<Product>(`/api/v1/product/${slug}`);
 
 if (error.value) {
     throw createError({
@@ -262,6 +262,7 @@ if (error.value) {
 const product = computed(() => productData.value || {
     id: '',
     name: 'Cargando...',
+    slug: '',
     description: '',
     price: 0,
     stock: 0,
@@ -279,6 +280,7 @@ productImages.value = [
 ];
 
 const currentDisplayImage = computed(() => productImages.value[currentImageIndex.value]);
+console.log("productos  relaciones ", product.value.id);
 
 // Obtener productos relacionados
 const { data: relatedProductsData } = await useFetch<Product[]>(`/api/v1/productByCategoryId/${product.value.categoryId}`,

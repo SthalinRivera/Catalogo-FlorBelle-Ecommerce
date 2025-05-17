@@ -44,6 +44,6 @@ const { data: categoriesData, pending } = await useFetch<Category[]>('/api/v1/ca
 const categories = computed(() => categoriesData.value || [])
 
 const navigateToCategory = (category: Category) => {
-    navigateTo(`/category/${category.id}`)
+    navigateTo(`/category/${category.slug}`)
 }
 </script>
