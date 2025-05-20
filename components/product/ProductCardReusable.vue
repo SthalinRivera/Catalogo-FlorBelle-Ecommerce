@@ -5,7 +5,7 @@
         <!-- Contenedor de imagen con aspect ratio fijo -->
         <div class="relative w-full aspect-square bg-gray-100 dark:bg-slate-700 overflow-hidden">
             <img :src="product.imageUrl" :alt="product.name"
-                class="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105" />
+                class="object-cover w-80 h-40  md:w-full md:h-80 transition-transform duration-300 group-hover:scale-105" />
         </div>
 
         <!-- Contenido de la tarjeta -->

@@ -5,60 +5,51 @@
             Productos en Oferta
         </h1>
 
-        <div v-if="!pending && products.length === 0"
-            class="relative overflow-hidden rounded-xl shadow-lg my-8 min-h-[400px] flex items-center justify-center group border-2 border-dashed border-gray-200 dark:border-slate-700">
-            <!-- Fondo sutil con textura -->
-            <div
-                class="absolute inset-0 bg-[url('/images/empty-promo-pattern.svg')] bg-[length:200px] opacity-5 dark:opacity-[0.02]">
+        <!-- Filtros y ordenación -->
+        <div class="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <UInput v-model="searchQuery" placeholder="Buscar productos..." icon="i-heroicons-magnifying-glass"
+                class="min-w-[250px]" />
+
+            <div class="flex items-center gap-4">
+                <USelect v-model="sortBy" :options="sortOptions" class="w-40" />
+                <USelect v-model="sortOrder" :options="orderOptions" class="w-28" />
+                <USelect v-model="itemsPerPage" :options="[6, 12, 24]" class="w-24" />
             </div>
-            <!-- Contenido principal -->
-            <div class="relative z-10 text-center p-8 max-w-2xl mx-auto">
-                <!-- Icono de oferta vacía -->
+        </div>
+
+        <!-- Estado de carga -->
+        <div v-if="pending" class="flex justify-center py-12">
+            <UProgress animation="carousel" />
+        </div>
+
+        <!-- Estado vacío -->
+        <div v-else-if="!pending && filteredProducts.length === 0"
+            class="relative overflow-hidden rounded-xl shadow-lg my-8 min-h-[400px] flex items-center justify-center group border-2 border-dashed border-gray-200 dark:border-slate-700">
+            <div class="text-center p-8 max-w-2xl mx-auto">
                 <div
                     class="mb-6 inline-flex p-5 rounded-full bg-gradient-to-br from-gray-100 to-gray-50 dark:from-slate-800 dark:to-slate-700 shadow-inner">
                     <UIcon name="i-heroicons-tag" class="w-12 h-12 text-gray-400 dark:text-slate-500" />
                 </div>
-                <!-- Texto principal -->
                 <h3 class="text-3xl font-bold text-gray-700 dark:text-gray-300 mb-3">
-                    ¡Sin promociones activas!
+                    ¡No se encontraron productos!
                 </h3>
-                <!-- Descripción -->
                 <p class="text-lg text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                    Actualmente no tenemos descuentos disponibles, pero regresa pronto para no perderte nuestras ofertas
-                    especiales.
+                    No hay productos que coincidan con tu búsqueda.
                 </p>
-                <!-- Llamada a la acción -->
-                <div class="flex flex-col sm:flex-row justify-center gap-3">
-                    <UButton to="/product" size="lg" color="pink" variant="solid" class="shadow-sm hover:shadow-md   ">
-                        <UIcon name="i-heroicons-shopping-bag" class="mr-2 w-5 h-5" />
-                        Ver productos
-                    </UButton>
-
-                    <UButton to="#subscribe" size="lg" variant="outline"
-                        class="border-slate-100  dark:border-slate-600">
-                        <UIcon name="i-heroicons-envelope" class="mr-2 w-5 h-5" />
-                        Notificarme
-                    </UButton>
-                </div>
-                <!-- Elementos decorativos sutiles -->
-                <div
-                    class="absolute -bottom-20 -right-20 w-40 h-40 bg-pink-500/5 rounded-full blur-xl group-hover:bg-pink-500/10 transition-all duration-500">
-                </div>
-                <div
-                    class="absolute -top-20 -left-20 w-60 h-60 bg-blue-500/5 rounded-full blur-xl group-hover:bg-blue-500/10 transition-all duration-700">
-                </div>
             </div>
         </div>
 
-
+        <!-- Error -->
         <div v-else-if="error" class="text-red-500">
-            Error al cargar las ofertas
+            Error al cargar las ofertas: {{ error.message }}
         </div>
 
-        <div v-else class="">
+        <!-- Contenido principal -->
+        <div v-else>
             <!-- Grid de productos -->
-            <div class="grid gap-1 md:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ">
-                <NuxtLink v-for="product in products" :key="product.id" :to="`/product/${product.slug || product.id}`"
+            <div class="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <NuxtLink v-for="product in paginatedProducts" :key="product.id"
+                    :to="`/product/${product.slug || product.id}`"
                     class="group flex bg-gray-50 dark:bg-slate-800  transition-all duration-300 md:flex-row rounded-lg">
                     <!-- Imagen del producto -->
                     <div class="relative overflow-hidden rounded-s-lg ">
@@ -140,12 +131,89 @@
                     </div>
                 </NuxtLink>
             </div>
+
+            <!-- Paginación -->
+            <div class="mt-8 flex justify-center" v-if="filteredProducts.length > itemsPerPage">
+                <UPagination v-model="currentPage" :page-count="itemsPerPage" :total="filteredProducts.length" />
+            </div>
         </div>
     </div>
 </template>
 
-
 <script setup lang="ts">
-const { data: products, error, pending } = useFetch('/api/v1/promotionactive');
+// Estado reactivo
+const searchQuery = ref('');
+const currentPage = ref(1);
+const itemsPerPage = ref(6);
+const sortBy = ref('name');
+const sortOrder = ref('asc');
 
+// Opciones de ordenación
+const sortOptions = [
+    { value: 'name', label: 'Nombre' },
+    { value: 'price', label: 'Precio' },
+    { value: 'discount', label: 'Descuento' }
+];
+
+const orderOptions = [
+    { value: 'asc', label: 'Ascendente' },
+    { value: 'desc', label: 'Descendente' }
+];
+
+// Obtener datos
+const { data: products, pending, error } = await useFetch('/api/v1/promotionactive');
+
+// Procesar productos
+const processedProducts = computed(() => {
+    if (!products.value) return [];
+
+    return products.value.map(product => ({
+        ...product,
+        currentPrice: product.currentPrice || product.price,
+        originalPrice: product.originalPrice || product.price
+    }));
+});
+
+// Filtrar productos
+const filteredProducts = computed(() => {
+    const query = searchQuery.value.toLowerCase();
+    return processedProducts.value.filter(product =>
+        product.name.toLowerCase().includes(query) ||
+        (product.description && product.description.toLowerCase().includes(query))
+    ).sort((a, b) => {
+        // Ordenación
+        if (sortBy.value === 'name') {
+            return sortOrder.value === 'asc'
+                ? a.name.localeCompare(b.name)
+                : b.name.localeCompare(a.name);
+        } else if (sortBy.value === 'price') {
+            return sortOrder.value === 'asc'
+                ? a.currentPrice - b.currentPrice
+                : b.currentPrice - a.currentPrice;
+        } else if (sortBy.value === 'discount') {
+            const discountA = a.originalPrice - a.currentPrice;
+            const discountB = b.originalPrice - b.currentPrice;
+            return sortOrder.value === 'asc'
+                ? discountA - discountB
+                : discountB - discountA;
+        }
+        return 0;
+    });
+});
+
+// Productos paginados
+const paginatedProducts = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    const end = start + itemsPerPage.value;
+    return filteredProducts.value.slice(start, end);
+});
+
+// Resetear página cuando cambian los filtros
+watch([searchQuery, sortBy, sortOrder, itemsPerPage], () => {
+    currentPage.value = 1;
+});
 </script>
+
+<style scoped>
+/* Estilos adicionales si son necesarios */
+</style>

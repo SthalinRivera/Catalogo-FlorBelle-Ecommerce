@@ -3,8 +3,8 @@
         <Breadcrumb :items="[
             { title: 'Productos', to: '/dashboard/products' },
             { title: 'Promoción', to: '/dashboard/promotion' }
-
         ]" />
+
         <!-- Header y botón -->
         <div class="flex justify-between items-center mb-6">
             <div>
@@ -13,6 +13,23 @@
             </div>
             <UButton @click="openModal()" icon="i-heroicons-plus" color="primary" variant="solid"
                 label="Nueva Promoción" />
+        </div>
+
+        <!-- Filtros y búsqueda -->
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <UInput v-model="searchQuery" placeholder="Buscar promociones..." icon="i-heroicons-magnifying-glass" />
+            <USelect v-model="sortField" :options="sortOptions" placeholder="Ordenar por" />
+            <USelect v-model="sortDirection" :options="[
+                { value: 'asc', label: 'Ascendente' },
+                { value: 'desc', label: 'Descendente' }
+            ]" />
+            <USelect v-model="statusFilter" :options="[
+                { value: 'all', label: 'Todos los estados' },
+                { value: 'active', label: 'Solo activas' },
+                { value: 'inactive', label: 'Solo inactivas' },
+                { value: 'upcoming', label: 'Próximas' },
+                { value: 'expired', label: 'Expiradas' }
+            ]" />
         </div>
 
         <!-- Loading State -->
@@ -26,25 +43,24 @@
             class="mb-4" />
 
         <!-- Empty State -->
-        <UCard v-else-if="products.length === 0" class="text-center">
+        <UCard v-else-if="filteredPromotions.length === 0" class="text-center">
             <template #header>
                 <div
                     class="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-                    <UIcon name="i-heroicons-shopping-bag" class="text-3xl text-gray-400 dark:text-gray-500" />
+                    <UIcon name="i-heroicons-tag" class="text-3xl text-gray-400 dark:text-gray-500" />
                 </div>
-                <h3 class="text-lg font-medium text-gray-800 dark:text-white mb-2">No se encontraron productos.</h3>
-                <p class="text-gray-500 dark:text-gray-400 mb-4">Comienza agregando tu primer producto.</p>
+                <h3 class="text-lg font-medium text-gray-800 dark:text-white mb-2">No se encontraron promociones.</h3>
+                <p class="text-gray-500 dark:text-gray-400 mb-4">Comienza agregando tu primera promoción.</p>
             </template>
 
             <UButton @click="openModal()" icon="i-heroicons-plus" color="primary" variant="solid"
-                label="Agregar Producto" />
+                label="Agregar Promoción" />
         </UCard>
-
-
 
         <!-- Tabla con Nuxt UI -->
         <div v-else>
-            <UTable :rows="promotions" :columns="columns" :loading="loading" class="w-full">
+            <UTable :rows="paginatedPromotions" :columns="columns" :loading="loading" class="w-full"
+                :sort="{ column: sortField, direction: sortDirection }" @sort="onSort">
                 <!-- Custom cell for Product -->
                 <template #product-data="{ row }">
                     <div class="flex items-center">
@@ -95,12 +111,17 @@
                 </template>
             </UTable>
 
-            <!-- Paginación si es necesaria -->
-            <div class="flex justify-end px-3 py-3.5 border-t border-gray-200 dark:border-gray-700">
-                <UPagination v-if="promotions.length > 0" v-model="page" :page-count="pageCount"
-                    :total="promotions.length" />
+            <!-- Paginación -->
+            <div class="flex justify-between items-center px-3 py-3.5 border-t border-gray-200 dark:border-gray-700">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    Mostrando {{ paginationInfo.from }} a {{ paginationInfo.to }} de {{ paginationInfo.total }}
+                    promociones
+                </div>
+                <UPagination v-model="paginationState.page" :page-count="paginationState.perPage"
+                    :total="filteredPromotions.length" />
             </div>
         </div>
+
         <!-- Modal para crear/editar promoción -->
         <UModal v-model="showModal">
             <UCard>
@@ -108,7 +129,6 @@
                     <h2 class="text-xl font-bold">{{ editing ? 'Editar Promoción' : 'Nueva Promoción' }}</h2>
                 </template>
                 <div class="p-6">
-
                     <form @submit.prevent="submitPromotion" class="space-y-4">
                         <UFormGroup label="Producto" required>
                             <USelect v-model="form.productId"
@@ -174,9 +194,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
-import { format, isAfter, isBefore } from 'date-fns';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { format, isAfter, isBefore, parseISO } from 'date-fns';
+
 const { $toast } = useNuxtApp();
+
 // Estado reactivo
 const promotions = ref([]);
 const products = ref([]);
@@ -186,9 +208,29 @@ const showDeleteDialog = ref(false);
 const editing = ref(false);
 const currentPromoId = ref(null);
 
+// Filtros y ordenamiento
+const searchQuery = ref('');
+const sortField = ref('product.name');
+const sortDirection = ref('asc');
+const statusFilter = ref('all');
+
+const sortOptions = [
+    { value: 'product.name', label: 'Nombre del producto' },
+    { value: 'product.price', label: 'Precio del producto' },
+    { value: 'discount', label: 'Descuento' },
+    { value: 'startDate', label: 'Fecha de inicio' },
+    { value: 'endDate', label: 'Fecha de fin' }
+];
+
+// Paginación
+const pagination = reactive({
+    page: 1,
+    perPage: 10
+});
+
 const form = reactive({
     productId: null,
-    title: '',
+    title: 'Oferta Especial',
     description: '',
     discount: 0,
     isPercentage: true,
@@ -196,24 +238,35 @@ const form = reactive({
     endDate: ''
 });
 
-
 // Columnas para la tabla
-const columns = [{
-    key: 'product',
-    label: 'Producto'
-}, {
-    key: 'discount',
-    label: 'Descuento'
-}, {
-    key: 'dateRange',
-    label: 'Vigencia'
-}, {
-    key: 'status',
-    label: 'Estado'
-}, {
-    key: 'actions',
-    label: 'Acciones'
-}];
+const columns = [
+    {
+        key: 'product',
+        label: 'Producto',
+        sortable: true
+    },
+    {
+        key: 'discount',
+        label: 'Descuento',
+        sortable: true
+    },
+    {
+        key: 'dateRange',
+        label: 'Vigencia',
+        sortable: false // Manejamos esto manualmente
+    },
+    {
+        key: 'status',
+        label: 'Estado',
+        sortable: false
+    },
+    {
+        key: 'actions',
+        label: 'Acciones',
+        sortable: false
+    }
+];
+
 // Configuración de página (Nuxt.js)
 definePageMeta({
     middleware: ['auth'],
@@ -234,7 +287,7 @@ const loadInitialData = async () => {
         products.value = productsRes || [];
     } catch (error) {
         console.error('Error cargando datos iniciales:', error);
-        $toast.success("Error al cargar datos");
+        $toast.error("Error al cargar datos");
     } finally {
         loading.value = false;
     }
@@ -242,6 +295,114 @@ const loadInitialData = async () => {
 
 // Usar useAsyncData para SSR (Nuxt.js)
 onMounted(loadInitialData);
+
+
+// Estado de paginación (modificado para evitar duplicación)
+const paginationState = reactive({
+    page: 1,
+    perPage: 10
+});
+
+// Computed properties
+const filteredPromotions = computed(() => {
+    let result = [...promotions.value];
+
+    // Filtrar por búsqueda
+    if (searchQuery.value) {
+        const query = searchQuery.value.toLowerCase();
+        result = result.filter(promo =>
+            (promo.product?.name?.toLowerCase().includes(query)) ||
+            (promo.title?.toLowerCase().includes(query)) ||
+            (promo.description?.toLowerCase().includes(query))
+        );
+    }
+
+    // Filtrar por estado
+    if (statusFilter.value !== 'all') {
+        const today = new Date();
+        result = result.filter(promo => {
+            const startDate = new Date(promo.startDate);
+            const endDate = new Date(promo.endDate);
+
+            switch (statusFilter.value) {
+                case 'active':
+                    return isAfter(today, startDate) && isBefore(today, endDate);
+                case 'inactive':
+                    return !(isAfter(today, startDate) && isBefore(today, endDate));
+                case 'upcoming':
+                    return isBefore(today, startDate);
+                case 'expired':
+                    return isAfter(today, endDate);
+                default:
+                    return true;
+            }
+        });
+    }
+
+    // Ordenar
+    if (sortField.value) {
+        result.sort((a, b) => {
+            let valueA, valueB;
+
+            // Manejar campos anidados
+            if (sortField.value.includes('.')) {
+                const [parent, child] = sortField.value.split('.');
+                valueA = a[parent]?.[child];
+                valueB = b[parent]?.[child];
+            } else {
+                valueA = a[sortField.value];
+                valueB = b[sortField.value];
+            }
+
+            // Manejar fechas
+            if (sortField.value.includes('Date')) {
+                valueA = new Date(valueA).getTime();
+                valueB = new Date(valueB).getTime();
+            }
+
+            // Manejar números
+            if (typeof valueA === 'number' || sortField.value === 'discount') {
+                valueA = Number(valueA);
+                valueB = Number(valueB);
+            }
+
+            // Manejar strings
+            if (typeof valueA === 'string') {
+                valueA = valueA.toLowerCase();
+                valueB = valueB.toLowerCase();
+            }
+
+            if (valueA < valueB) {
+                return sortDirection.value === 'asc' ? -1 : 1;
+            }
+            if (valueA > valueB) {
+                return sortDirection.value === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+    }
+
+    return result;
+});
+
+const paginatedPromotions = computed(() => {
+    const start = (paginationState.page - 1) * paginationState.perPage;
+    const end = start + paginationState.perPage;
+    return filteredPromotions.value.slice(start, end);
+});
+
+const paginationInfo = computed(() => {
+    const total = filteredPromotions.value.length;
+    const from = (paginationState.page - 1) * paginationState.perPage + 1;
+    const to = Math.min(paginationState.page * paginationState.perPage, total);
+
+    return {
+        total,
+        from,
+        to,
+        lastPage: Math.ceil(total / paginationState.perPage)
+    };
+});
 
 // Métodos
 const openModal = () => {
@@ -275,6 +436,11 @@ const resetForm = () => {
         startDate: format(new Date(), 'yyyy-MM-dd'),
         endDate: ''
     });
+};
+
+const onSort = (column) => {
+    sortField.value = column.column;
+    sortDirection.value = column.direction;
 };
 
 // Función para verificar si una promoción está activa
@@ -337,7 +503,7 @@ const deletePromotion = async () => {
         await loadInitialData();
         $toast.success("Promoción eliminada con éxito");
     } catch (error) {
-        $toast.success("Error al eliminar la promoción");
+        $toast.error("Error al eliminar la promoción");
         console.error(error);
     } finally {
         showDeleteDialog.value = false;
